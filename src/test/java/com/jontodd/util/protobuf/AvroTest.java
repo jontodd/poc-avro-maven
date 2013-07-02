@@ -6,10 +6,10 @@ import com.jontodd.util.avro.JellyBeanV3;
 import com.jontodd.util.avro.JellyBeanV4;
 import com.jontodd.util.avro.JellyBeanV5;
 import com.jontodd.util.avro.JellyBeanV6;
+import com.jontodd.util.avro.JellyBeanV7;
 import com.jontodd.util.avro.Size;
-import junit.framework.Assert;
 import org.apache.avro.AvroRuntimeException;
-import org.apache.avro.AvroTypeException;
+import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.file.SeekableByteArrayInput;
@@ -37,6 +37,7 @@ import static org.testng.Assert.assertEquals;
  * JellyBeanV4 - Add an optional size w/o default to V1
  * JellyBeanV5 - Add a default the optional texture property in V4
  * JellyBeanV6 - Add a optional string without a default to V1
+ * JellyBeanV7 - Same as V1 but with swapped order (id then name)
  *
  * @author Jon Todd
  */
@@ -125,7 +126,8 @@ public class AvroTest {
      * Schema evolution
      */
 
-    @Test(expectedExceptions = AvroTypeException.class)
+    // TODO: Difference - Avro doesn't fail on introducing required fields
+    @Test
     public void introducingNewRequiredFieldWithoutDefault() throws IllegalStateException, IOException {
         byte[] serializedV1 = toByteArray(JellyBeanV1.newBuilder()
                 .setName("Liquorish")
@@ -139,15 +141,10 @@ public class AvroTest {
                 .build());
 
         // Old parser new message should work
-        parseFrom(serializedV2, JellyBeanV1.class);
+        parseFrom(serializedV2, JellyBeanV2.getClassSchema(), JellyBeanV1.getClassSchema());
 
-        // New parser old message should fail
-        try {
-            parseFrom(serializedV1, JellyBeanV2.class);
-            Assert.assertTrue("New parser on old message without required field should fail", false);
-        } catch (IllegalStateException ex) {
-            Assert.assertTrue(true); // Expect to get here
-        }
+        // New parser old message
+        parseFrom(serializedV1, JellyBeanV1.getClassSchema(), JellyBeanV2.getClassSchema());
     }
 
     /*
@@ -189,10 +186,10 @@ public class AvroTest {
                 .build());
 
         // Old parser new message should work
-        parseFrom(serializedV4, JellyBeanV1.class);
+        parseFrom(serializedV4, JellyBeanV4.getClassSchema(), JellyBeanV1.getClassSchema());
 
         // New parser old message should work
-        parseFrom(serializedV1, JellyBeanV4.class);
+        parseFrom(serializedV1, JellyBeanV1.getClassSchema(), JellyBeanV4.getClassSchema());
     }
 
     @Test
@@ -215,6 +212,27 @@ public class AvroTest {
         parseFrom(serializedV1, JellyBeanV5.class);
     }
 
+    // V1 and V7 have the same fields id, name but
+    @Test
+    public void doesSchemaOrderMatter() throws IllegalStateException, IOException {
+        byte[] serializedV1 = toByteArray(JellyBeanV1.newBuilder()
+                .setName("Liquorish")
+                .setId(1)
+                .build());
+
+        byte[] serializedV7 = toByteArray(JellyBeanV7.newBuilder()
+                .setName("Liquorish")
+                .setId(3)
+                .build());
+
+        // Old parser new message should work
+        parseFrom(serializedV7, JellyBeanV1.class);
+
+        // New parser old message should work
+        parseFrom(serializedV1, JellyBeanV7.class);
+    }
+
+
 
     private <U extends GenericContainer> byte[] toByteArray(U bean) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -225,6 +243,13 @@ public class AvroTest {
         dataFileWriter.close();
         System.out.println(outputStream.toString());
         return outputStream.toByteArray();
+    }
+
+    private <U extends GenericContainer> U parseFrom(byte[] bytes, Schema readerSchema, Schema writerSchema) throws IOException {
+        DatumReader<U> reader = new SpecificDatumReader<U>(writerSchema, readerSchema);
+        SeekableInput input = new SeekableByteArrayInput(bytes);
+        DataFileReader<U> dataFileReader = new DataFileReader<U>(input, reader);
+        return dataFileReader.next();
     }
 
     private <U extends GenericContainer> U parseFrom(byte[] bytes, Class<U> clazz) throws IOException {

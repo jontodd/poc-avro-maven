@@ -58,5 +58,13 @@
        {"name": "id",  "type": "int"},
        {"name": "texture", "type": ["string","null"]}
    ]
-  }
+  },
+  {"namespace": "com.jontodd.util.avro",
+     "type": "record",
+     "name": "JellyBeanV7",
+     "fields": [
+         {"name": "id",  "type": "int"},
+         {"name": "name", "type": "string"}
+     ]
+    }
 ]
