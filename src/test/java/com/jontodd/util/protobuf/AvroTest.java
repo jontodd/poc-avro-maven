@@ -9,6 +9,7 @@ import com.jontodd.util.avro.JellyBeanV6;
 import com.jontodd.util.avro.Size;
 import junit.framework.Assert;
 import org.apache.avro.AvroRuntimeException;
+import org.apache.avro.AvroTypeException;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.file.SeekableByteArrayInput;
@@ -124,7 +125,7 @@ public class AvroTest {
      * Schema evolution
      */
 
-    @Test
+    @Test(expectedExceptions = AvroTypeException.class)
     public void introducingNewRequiredFieldWithoutDefault() throws IllegalStateException, IOException {
         byte[] serializedV1 = toByteArray(JellyBeanV1.newBuilder()
                 .setName("Liquorish")
@@ -152,6 +153,7 @@ public class AvroTest {
     /*
      * In this case V3 has a default set for color but it still fails parsing a V1 without a color set.
      */
+    // TODO: Difference - removing a required field breaks protobuf, it doesn't break avro. It's odd that avro would allow this contract to be broken
     @Test
     public void introducingNewRequiredFieldWithDefault() throws IllegalStateException, IOException {
         byte[] serializedV1 = toByteArray(JellyBeanV1.newBuilder()
@@ -169,15 +171,11 @@ public class AvroTest {
         parseFrom(serializedV3, JellyBeanV1.class);
 
         // New parser old message should fail
-        try {
-            parseFrom(serializedV1, JellyBeanV3.class);
-            Assert.assertTrue("New parser on old message without required field should fail", false);
-        } catch (IllegalStateException ex) {
-            Assert.assertTrue(true); // Expect to get here
-        }
+        parseFrom(serializedV1, JellyBeanV3.class);
     }
 
-    @Test
+    // TODO: Difference - Avro doesn't allow optional fields to not have defaults
+    @Test(expectedExceptions = AvroRuntimeException.class)
     public void introducingNewOptionalFieldWithoutDefault() throws IllegalStateException, IOException {
         byte[] serializedV1 = toByteArray(JellyBeanV1.newBuilder()
                 .setName("Liquorish")
